@@ -1,123 +1,265 @@
-import mido
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[2]:
+
+
+from mido import MidiFile
+import time
 import operator
 from mido import MidiFile
+import math
+piece = "Knewyouweretrouble.mid"
+mid_in = MidiFile(piece,clip=True)
 
 
-def skyline(filename):
-    mid_in = MidiFile(filename)
-    
-    #change time
-    for i in range(0,len(mid_in.tracks)-1,1):
-        t=0
-        if mid_in.tracks[i][0].type == 'note_on' or mid_in.tracks[i][0].type == 'note_off' or mid_in.tracks[i][0].type == 'polytouch' or mid_in.tracks[i][0].type == 'control_change' or mid_in.tracks[i][0].type == 'program_change' or mid_in.tracks[i][0].type == 'aftertouch' or mid_in.tracks[i][0].type == 'pitchwheel':
-            mid_in.tracks[i][0].channel = 0
-        for j in range(1,len(mid_in.tracks[i])-1,1):
-            t += mid_in.tracks[i][j].time
-            mid_in.tracks[i][j].time = t
-            if mid_in.tracks[i][0].type == 'note_on' or mid_in.tracks[i][0].type == 'note_off' or mid_in.tracks[i][0].type == 'polytouch' or mid_in.tracks[i][0].type == 'control_change' or mid_in.tracks[i][0].type == 'program_change' or mid_in.tracks[i][0].type == 'aftertouch' or mid_in.tracks[i][0].type == 'pitchwheel':
-                mid_in.tracks[i][0].channel = 0
+# In[3]:
 
-    mid_out = MidiFile()
-    now_on = []
-    now_on_msg = []
-    sky = mido.Message('note_on', note=0, velocity=0, time=0)
-    tick = 0
 
-    #mido.merge_tracks(mid_in.tracks)
+from miditoolkit.midi import parser as mid_parser  
+from miditoolkit.midi import containers as ct
 
-    #set file
-    mid_out.ticks_per_beat = mid_in.ticks_per_beat
-    mid_out.type = mid_in.type
-    mid_out.charset = mid_in.charset
 
-    #skyline for every tracks
-    for i, track in enumerate(mid_in.tracks):
-        #create same number of track of mid_in for mid_out
-        mid_out.add_track()
-        mid_out.tracks[i].name = track.name
+# In[4]:
 
-        for message in track:
-            #meta message
-            if message.type != 'note_on' and message.type != 'note_off':
-                message.time += tick
-                tick = 0
-                mid_out.tracks[i].append(message)
-                #tick += message.time
-                #print(1)
 
-            #note on event
-            elif message.type == 'note_on' and message.velocity != 0:
-                if message.note >= sky.note:
-                    if sky.note > 0 and message.note != sky.note:
-                        sky.time = 0
-                        now_on.append(sky.note)
-                        now_on_msg.append(sky)
-                        #sort by note(low to high)
-                        now_on.sort()
-                        now_on_msg.sort(key=lambda message: message.note)
+# from music21 import *
+# c = converter.parse(piece) #Also OK, check how to process
 
-                        temp = mido.Message('note_off')
-                        temp.note = sky.note
-                        temp.channel = sky.channel
-                        temp.velocity = 0
-                        temp.time = message.time
-                        message.time = tick
-                        tick = 0
-                        mid_out.tracks[i].append(temp)
-                        mid_out.tracks[i].append(message)
-                        sky = message
-                    else:
-                        message.time += tick
-                        tick = 0
-                        mid_out.tracks[i].append(message)
-                        sky = message
 
-                elif not(message.note in now_on):
-                    tick += message.time
-                    message.time = 0
-                    now_on.append(message.note)
-                    now_on_msg.append(message)
-                    #sort by note(low to high)
-                    now_on.sort()
-                    now_on_msg.sort(key=lambda message: message.note)
+# In[5]:
 
-                else:
-                    tick += message.time
-                    now_on_msg.pop(now_on.index(message.note))
-                    now_on_msg.insert(now_on.index(message.note),message)
 
-            #note off event
+#https://stackoverflow.com/questions/63105201/python-mido-how-to-get-note-starttime-stoptime-track-in-a-list
+#https://dev.to/varlen/editing-midi-files-with-python-2m0g (checking how to get back this)
+
+
+# In[6]:
+
+
+import numpy as np
+class noteMidi:
+    def __init__(self,p,s,e):
+        self.pitch = p
+        self.onset = s
+        self.offset = e
+        
+def mergeIntervals(arr):
+        # Sorting based on the increasing order 
+        # of the start intervals
+        arr.sort(key = lambda x: x[0]) 
+        # array to hold the merged intervals
+        m = []
+        s = -10000
+        max = -100000
+        for i in range(len(arr)):
+            a = arr[i]
+            if a[0] > max:
+                if i != 0:
+                    m.append([s,max])
+                max = a[1]
+                s = a[0]
             else:
-                if message.note >= sky.note:
-                    message.time += tick
-                    mid_out.tracks[i].append(message)
-                    tick = 0
-                    if len(now_on)!=0:
-                        now_on.pop()
-                        message = now_on_msg.pop()
-                        message.time = 0
-                        mid_out.tracks[i].append(message)
-                        sky = message
-                    else:
-                        sky = mido.Message('note_on', note=0, velocity=0, time=0)
+                if a[1] >= max:
+                    max = a[1]        
+        #'max' value gives the last point of 
+        # that particular interval
+        # 's' gives the starting point of that interval
+        # 'm' array contains the list of all merged intervals
+        if max != -100000 and [s, max] not in m:
+            m.append([s, max])
+        return m
 
-                else:
-                    tick += message.time
-                    if message in now_on_msg:
-                        now_on_msg.pop(now_on_msg.index(message))
-                    if message.note in now_on:
-                        now_on.remove(message.note)
+def gettop(note,intervals):
+    note_interval = [note.onset,note.offset]
+    overlap_time = 0
+    total_time = note.offset - note.onset
+    if total_time == 0:
+        return 1 #(we do not need this note)
+    for interval in intervals:
+        maxstart = max(note_interval[0],interval[0])
+        minend = min(note_interval[1],interval[1])
+        if maxstart < minend:
+            overlap_time += minend-maxstart
+    return overlap_time/total_time
 
-        del now_on[:]
-        del now_on_msg[:]
-        sky = mido.Message('note_on', note=0, velocity=0, time=0)
-        tick = 0
+def skyline(notes): #revised skyline algorithm by Chai, 2000
+    #Performed on a single channel
+    accepted_notes = []
+    notes = sorted(notes, key=lambda x: x.pitch, reverse=True)
+    intervals = []
+    for note in notes:
+        if gettop(note,intervals) <=0.5:
+            accepted_notes.append(note)
+            intervals.append([note.onset,note.offset])
+            intervals = mergeIntervals(intervals)
+    return sorted(accepted_notes,key=lambda x: x.onset)
+    
+    
+            
 
-    #change time back
-    for i in range(len(mid_out.tracks)-1,0,-1):
-        for j in range(len(mid_out.tracks[i])-1,1,-1):
-            mid_out.tracks[i][j].time = mid_out.tracks[i][j].time - mid_out.tracks[i][j-1].time
-            if mid_out.tracks[i][j].time < 0:
-                mid_out.tracks[i][j].time = 0
 
-    mid_out.save('test.mid')
+# In[7]:
+
+
+# # channel_no = 6
+# notelist = []
+# for inst in mido_obj.instruments:
+#     for notes in inst.notes:
+#         notelist.append(noteMidi(notes.pitch,notes.start,notes.end))
+# notelist_new = skyline(notelist)
+# print(len(notelist),len(notelist_new))
+
+
+# In[8]:
+
+
+#Helper function for calculating Eucliedean Distance
+#Works with list as well as properly indexed dictionary
+def dist(v1,v2):
+    assert len(v1) == len(v2)
+    tmp = 0
+    for dim in range(len(v1)):
+        tmp += (v1[dim]-v2[dim]) ** 2
+    return math.sqrt(tmp)
+
+def cluster_dist(c1,c2,histo):
+    dict1 = dict()
+    dict2 = dict()
+    for i in range(12):
+        dict1[i] = 0
+        dict2[i] = 0
+    for ind in c1:
+        for k in histo[ind]:
+            dict1[k] += histo[ind][k]
+    for ind in c2:
+        for k in histo[ind]:
+            dict2[k] += histo[ind][k]
+    return dist(dict1,dict2)
+    
+
+
+# In[21]:
+
+
+# Implementation of the paper: Melody extraction on MIDI music files (Ozcan etal,2005)
+piece = "bwv1067/MENUET.mid"
+mido_obj = mid_parser.MidiFile(piece)
+tpb = mido_obj.ticks_per_beat
+all_notes = [] #This will be a 2D list of notes for each channel
+for inst in mido_obj.instruments:
+    print(inst)
+    #ignore percussion channel
+    if inst.is_drum:
+        continue
+    notelist = []
+    for notes in inst.notes:
+        notelist.append(noteMidi(notes.pitch,notes.start,notes.end))
+    notelist = skyline(notelist)
+    if len(notelist) > 0:
+        all_notes.append(notelist)
+#Calculate a_i, b_i and x_i (refer to paper P.5)
+pitch_histogram = []
+x = []
+for notelist in all_notes:
+    total_pitch = 0
+    pitchrange = dict()
+    for note1 in notelist:
+        total_pitch += note1.pitch
+        if note1.pitch in pitchrange:
+            pitchrange[note1.pitch] += 1
+        else:
+            pitchrange[note1.pitch] = 1
+    avg_pitch = total_pitch / len(notelist) #This is a_i
+    entropy = 0
+    pitchhist = dict()
+    for i in range(12):
+        pitchhist[i] = 0
+    for distinct_pitch in pitchrange:
+        probit = pitchrange[distinct_pitch] / len(notelist)
+        entropy += probit * math.log(probit,128)
+        pitchhist[distinct_pitch%12] += pitchrange[distinct_pitch]
+    entropy = -entropy # This is b_i
+    x.append(avg_pitch+128*entropy)#This is x_i
+    pitch_histogram.append(pitchhist) #Pitch histogram normalized to 12 pitches
+#Calculate Clustering Threshold
+#First Calculate average histogram h_A
+avg_histogram = dict()
+for i in range(12):
+    avg_histogram[i] = 0
+for ph in pitch_histogram:
+    for i in range(12):
+        avg_histogram[i] += ph[i]
+weighted_avg_histogram = avg_histogram.copy()
+total_pitch = 0
+for i in range(12):
+    total_pitch += avg_histogram[i]
+    avg_histogram[i] /= len(pitch_histogram)
+#IS THIS CORRECT??????????? (From paper equation 14)
+for i in range(12):
+    weighted_avg_histogram[i] = weighted_avg_histogram[i] * (weighted_avg_histogram[i]/total_pitch)
+#Threshold
+t = dist(avg_histogram,weighted_avg_histogram)#/2
+print("Threshold",t)
+clusters = [[i] for i in range(len(all_notes))] #index based to denote channels
+is_changed = True
+#Agglomerative Clustering: just use Naive O(n^2) method since n<=16
+#Here we 
+while is_changed:
+    is_changed = False
+    min_dist = t
+    min_c1,min_c2 = None,None
+    for c1 in clusters:
+        for c2 in clusters:
+            if c1 != c2:
+                new_dist = cluster_dist(c1,c2,pitch_histogram) 
+                if new_dist < min_dist:
+                    min_dist = new_dist
+                    min_c1 = c1
+                    min_c2 = c2
+    if min_c1 is not None:
+        is_changed = True
+        new_cluster = min_c1.copy()
+        new_cluster.extend(min_c2)
+        clusters.remove(min_c1)
+        clusters.remove(min_c2)
+        clusters.append(new_cluster)
+print("Resultant Cluster:",clusters)
+clustered_notelist = []
+#Select melody channels in each cluster and group them together
+for cluster in clusters:
+    max_x = 0
+    melody_channel = None
+    for ind in cluster:
+        if x[ind] > max_x:
+            max_x = x[ind]
+            melody_channel = ind
+    clustered_notelist.extend(all_notes[melody_channel])
+    print(f"channel {ind} selected as melody channel.")
+final_notelist = skyline(clustered_notelist)
+final_notelist2 = clustered_notelist #DIrectly include all
+
+
+# In[22]:
+
+
+mido_out = mid_parser.MidiFile()
+mido_out.ticks_per_beat = tpb
+track = ct.Instrument(program=0,is_drum=False,name='example track')
+mido_out.instruments = [track]
+for note in final_notelist:
+    mido_out.instruments[0].notes.append(ct.Note(start=note.onset,end=note.offset,pitch=note.pitch,velocity=30))
+mido_out.dump("result.mid")
+
+
+# In[23]:
+
+
+mido_out = mid_parser.MidiFile()
+mido_out.ticks_per_beat = tpb
+track = ct.Instrument(program=0,is_drum=False,name='example track')
+mido_out.instruments = [track]
+for note in final_notelist2:
+    mido_out.instruments[0].notes.append(ct.Note(start=note.onset,end=note.offset,pitch=note.pitch,velocity=30))
+mido_out.dump("result2.mid")
+
