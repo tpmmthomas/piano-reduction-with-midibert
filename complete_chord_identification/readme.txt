@@ -1,11 +1,8 @@
-code is in pipeline.ipynb
+The key code is in pipeline.ipynb
 
-all folders are the dependencies
+The running environment is specified in requirements.txt
 
-the running environment is specified in requirements.txt
-
-python 3.6 is used
-
+Python 3.6 is used
 
 -----------------------------------------------
 
