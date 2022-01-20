@@ -9,8 +9,8 @@ import time
 import operator
 from mido import MidiFile
 import math
-piece = "Knewyouweretrouble.mid"
-mid_in = MidiFile(piece,clip=True)
+# piece = "Knewyouweretrouble.mid"
+# mid_in = MidiFile(piece,clip=True)
 
 
 # In[3]:
@@ -143,123 +143,125 @@ def cluster_dist(c1,c2,histo):
 
 
 # Implementation of the paper: Melody extraction on MIDI music files (Ozcan etal,2005)
-piece = "bwv1067/MENUET.mid"
-mido_obj = mid_parser.MidiFile(piece)
-tpb = mido_obj.ticks_per_beat
-all_notes = [] #This will be a 2D list of notes for each channel
-for inst in mido_obj.instruments:
-    print(inst)
-    #ignore percussion channel
-    if inst.is_drum:
-        continue
-    notelist = []
-    for notes in inst.notes:
-        notelist.append(noteMidi(notes.pitch,notes.start,notes.end))
-    notelist = skyline(notelist)
-    if len(notelist) > 0:
-        all_notes.append(notelist)
-#Calculate a_i, b_i and x_i (refer to paper P.5)
-pitch_histogram = []
-x = []
-for notelist in all_notes:
+def skyline_melody(piece):
+# piece = "bwv1067/MENUET.mid"
+    mido_obj = mid_parser.MidiFile(piece)
+    tpb = mido_obj.ticks_per_beat
+    all_notes = [] #This will be a 2D list of notes for each channel
+    for inst in mido_obj.instruments:
+        print(inst)
+        #ignore percussion channel
+        if inst.is_drum:
+            continue
+        notelist = []
+        for notes in inst.notes:
+            notelist.append(noteMidi(notes.pitch,notes.start,notes.end))
+        notelist = skyline(notelist)
+        if len(notelist) > 0:
+            all_notes.append(notelist)
+    #Calculate a_i, b_i and x_i (refer to paper P.5)
+    pitch_histogram = []
+    x = []
+    for notelist in all_notes:
+        total_pitch = 0
+        pitchrange = dict()
+        for note1 in notelist:
+            total_pitch += note1.pitch
+            if note1.pitch in pitchrange:
+                pitchrange[note1.pitch] += 1
+            else:
+                pitchrange[note1.pitch] = 1
+        avg_pitch = total_pitch / len(notelist) #This is a_i
+        entropy = 0
+        pitchhist = dict()
+        for i in range(12):
+            pitchhist[i] = 0
+        for distinct_pitch in pitchrange:
+            probit = pitchrange[distinct_pitch] / len(notelist)
+            entropy += probit * math.log(probit,128)
+            pitchhist[distinct_pitch%12] += pitchrange[distinct_pitch]
+        entropy = -entropy # This is b_i
+        x.append(avg_pitch+128*entropy)#This is x_i
+        pitch_histogram.append(pitchhist) #Pitch histogram normalized to 12 pitches
+    #Calculate Clustering Threshold
+    #First Calculate average histogram h_A
+    avg_histogram = dict()
+    for i in range(12):
+        avg_histogram[i] = 0
+    for ph in pitch_histogram:
+        for i in range(12):
+            avg_histogram[i] += ph[i]
+    weighted_avg_histogram = avg_histogram.copy()
     total_pitch = 0
-    pitchrange = dict()
-    for note1 in notelist:
-        total_pitch += note1.pitch
-        if note1.pitch in pitchrange:
-            pitchrange[note1.pitch] += 1
-        else:
-            pitchrange[note1.pitch] = 1
-    avg_pitch = total_pitch / len(notelist) #This is a_i
-    entropy = 0
-    pitchhist = dict()
     for i in range(12):
-        pitchhist[i] = 0
-    for distinct_pitch in pitchrange:
-        probit = pitchrange[distinct_pitch] / len(notelist)
-        entropy += probit * math.log(probit,128)
-        pitchhist[distinct_pitch%12] += pitchrange[distinct_pitch]
-    entropy = -entropy # This is b_i
-    x.append(avg_pitch+128*entropy)#This is x_i
-    pitch_histogram.append(pitchhist) #Pitch histogram normalized to 12 pitches
-#Calculate Clustering Threshold
-#First Calculate average histogram h_A
-avg_histogram = dict()
-for i in range(12):
-    avg_histogram[i] = 0
-for ph in pitch_histogram:
+        total_pitch += avg_histogram[i]
+        avg_histogram[i] /= len(pitch_histogram)
+    #IS THIS CORRECT??????????? (From paper equation 14)
     for i in range(12):
-        avg_histogram[i] += ph[i]
-weighted_avg_histogram = avg_histogram.copy()
-total_pitch = 0
-for i in range(12):
-    total_pitch += avg_histogram[i]
-    avg_histogram[i] /= len(pitch_histogram)
-#IS THIS CORRECT??????????? (From paper equation 14)
-for i in range(12):
-    weighted_avg_histogram[i] = weighted_avg_histogram[i] * (weighted_avg_histogram[i]/total_pitch)
-#Threshold
-t = dist(avg_histogram,weighted_avg_histogram)#/2
-print("Threshold",t)
-clusters = [[i] for i in range(len(all_notes))] #index based to denote channels
-is_changed = True
-#Agglomerative Clustering: just use Naive O(n^2) method since n<=16
-#Here we 
-while is_changed:
-    is_changed = False
-    min_dist = t
-    min_c1,min_c2 = None,None
-    for c1 in clusters:
-        for c2 in clusters:
-            if c1 != c2:
-                new_dist = cluster_dist(c1,c2,pitch_histogram) 
-                if new_dist < min_dist:
-                    min_dist = new_dist
-                    min_c1 = c1
-                    min_c2 = c2
-    if min_c1 is not None:
-        is_changed = True
-        new_cluster = min_c1.copy()
-        new_cluster.extend(min_c2)
-        clusters.remove(min_c1)
-        clusters.remove(min_c2)
-        clusters.append(new_cluster)
-print("Resultant Cluster:",clusters)
-clustered_notelist = []
-#Select melody channels in each cluster and group them together
-for cluster in clusters:
-    max_x = 0
-    melody_channel = None
-    for ind in cluster:
-        if x[ind] > max_x:
-            max_x = x[ind]
-            melody_channel = ind
-    clustered_notelist.extend(all_notes[melody_channel])
-    print(f"channel {ind} selected as melody channel.")
-final_notelist = skyline(clustered_notelist)
-final_notelist2 = clustered_notelist #DIrectly include all
+        weighted_avg_histogram[i] = weighted_avg_histogram[i] * (weighted_avg_histogram[i]/total_pitch)
+    #Threshold
+    t = dist(avg_histogram,weighted_avg_histogram)#/2
+    print("Threshold",t)
+    clusters = [[i] for i in range(len(all_notes))] #index based to denote channels
+    is_changed = True
+    #Agglomerative Clustering: just use Naive O(n^2) method since n<=16
+    #Here we 
+    while is_changed:
+        is_changed = False
+        min_dist = t
+        min_c1,min_c2 = None,None
+        for c1 in clusters:
+            for c2 in clusters:
+                if c1 != c2:
+                    new_dist = cluster_dist(c1,c2,pitch_histogram) 
+                    if new_dist < min_dist:
+                        min_dist = new_dist
+                        min_c1 = c1
+                        min_c2 = c2
+        if min_c1 is not None:
+            is_changed = True
+            new_cluster = min_c1.copy()
+            new_cluster.extend(min_c2)
+            clusters.remove(min_c1)
+            clusters.remove(min_c2)
+            clusters.append(new_cluster)
+    print("Resultant Cluster:",clusters)
+    clustered_notelist = []
+    #Select melody channels in each cluster and group them together
+    for cluster in clusters:
+        max_x = 0
+        melody_channel = None
+        for ind in cluster:
+            if x[ind] > max_x:
+                max_x = x[ind]
+                melody_channel = ind
+        clustered_notelist.extend(all_notes[melody_channel])
+        print(f"channel {ind} selected as melody channel.")
+    final_notelist = skyline(clustered_notelist)
+    return final_notelist
+# final_notelist2 = clustered_notelist #DIrectly include all
 
 
 # In[22]:
 
 
-mido_out = mid_parser.MidiFile()
-mido_out.ticks_per_beat = tpb
-track = ct.Instrument(program=0,is_drum=False,name='example track')
-mido_out.instruments = [track]
-for note in final_notelist:
-    mido_out.instruments[0].notes.append(ct.Note(start=note.onset,end=note.offset,pitch=note.pitch,velocity=30))
-mido_out.dump("result.mid")
+# mido_out = mid_parser.MidiFile()
+# mido_out.ticks_per_beat = tpb
+# track = ct.Instrument(program=0,is_drum=False,name='example track')
+# mido_out.instruments = [track]
+# for note in final_notelist:
+#     mido_out.instruments[0].notes.append(ct.Note(start=note.onset,end=note.offset,pitch=note.pitch,velocity=30))
+# mido_out.dump("result.mid")
 
 
 # In[23]:
 
 
-mido_out = mid_parser.MidiFile()
-mido_out.ticks_per_beat = tpb
-track = ct.Instrument(program=0,is_drum=False,name='example track')
-mido_out.instruments = [track]
-for note in final_notelist2:
-    mido_out.instruments[0].notes.append(ct.Note(start=note.onset,end=note.offset,pitch=note.pitch,velocity=30))
-mido_out.dump("result2.mid")
+# mido_out = mid_parser.MidiFile()
+# mido_out.ticks_per_beat = tpb
+# track = ct.Instrument(program=0,is_drum=False,name='example track')
+# mido_out.instruments = [track]
+# for note in final_notelist2:
+#     mido_out.instruments[0].notes.append(ct.Note(start=note.onset,end=note.offset,pitch=note.pitch,velocity=30))
+# mido_out.dump("result2.mid")
 
