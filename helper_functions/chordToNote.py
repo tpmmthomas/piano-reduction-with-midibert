@@ -91,6 +91,7 @@ relative_major = {
     "DB": "E",
     "G#": "B",
     "EB": "GB",
+    "AB": "B",
     "BB": "DB",
     "F": "AB",
     "C": "EB",
