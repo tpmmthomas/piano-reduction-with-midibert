@@ -94,7 +94,28 @@ def skyline(notes): #revised skyline algorithm by Chai, 2000
             intervals.append([note.onset,note.offset])
             intervals = mergeIntervals(intervals)
     return sorted(accepted_notes,key=lambda x: x.onset)
-    
+
+
+def skyline2(notes): #revised skyline algorithm by Chai, 2000
+    #Performed on a single channel
+    accepted_notes = []
+    rejected_notes = []
+    notes = sorted(notes, key=lambda x: x.pitch, reverse=True)
+    intervals = []
+    for note in notes:
+        if gettop(note,intervals) <=0.5:
+            accepted_notes.append(note)
+            intervals.append([note.onset,note.offset])
+            intervals = mergeIntervals(intervals)
+        else:
+            rejected_notes.append(note)
+    intervals = []
+    for note in rejected_notes:#allow at most 2 line
+        if gettop(note,intervals) <=0.5:
+            accepted_notes.append(note)
+            intervals.append([note.onset,note.offset])
+            intervals = mergeIntervals(intervals)
+    return sorted(accepted_notes,key=lambda x: x.onset)    
     
             
 
@@ -238,7 +259,8 @@ def skyline_melody(piece):
         clustered_notelist.extend(all_notes[melody_channel])
         print(f"channel {ind} selected as melody channel.")
     final_notelist = skyline(clustered_notelist)
-    return final_notelist
+    final_notelist2 = skyline2(clustered_notelist)
+    return final_notelist,final_notelist2
 # final_notelist2 = clustered_notelist #DIrectly include all
 
 
