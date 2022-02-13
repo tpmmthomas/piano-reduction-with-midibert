@@ -116,5 +116,6 @@ dmypy.json
 #midi or other files
 /data
 *.mid
+*.pickle
 *.zip
 *.xml
