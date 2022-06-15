@@ -262,7 +262,8 @@ def skyline_melody(piece):
             if x[ind] > max_x:
                 max_x = x[ind]
                 melody_channel = ind
-        clustered_notelist.extend(all_notes[melody_channel])
+                clustered_notelist.extend(all_notes[ind])
+        # clustered_notelist.extend(all_notes[melody_channel])
         print(f"channel {ind} selected as melody channel.")
     final_notelist = skyline(clustered_notelist)
     # final_notelist2 = skyline2(clustered_notelist)
