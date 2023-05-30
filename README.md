@@ -9,6 +9,18 @@ To run the `DBM` method,
 2. Prepare also the piece to be reduced.
 3. go to `DBM/build_up.ipynb` and modify the directories, then run the code!
 
+## Pretraining
+(Note: If you need to run the training code, a powerful GPU is recommended.)
+1. Prepare midi used for pretraining
+2. Follow `MidiBERT/Pretraining.ipynb` and modify relevant arguments
+
+## The `MB-NR` method
+Please follow `MidiBERT/MBNR.ipynb` for more instructions regarding training and inferencing.
+
+
+## The `MB-R2F` method
+1. Prepare data following `MidiBERT/skinlineTokenize.ipynb`.
+2. Run `python MidiBERT/CP/main.py --mode seq2seq` and add other arguments as required.
 ## Evaluation
 All objective evaluation codes are included within the `eval` folder.
 1. Make any necessary directory changes in `eval/eval.py` 
