@@ -1,24 +1,11 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[2]:
-
-
-from mido import MidiFile
-import time
-import operator
-from mido import MidiFile
-import math
-
-# piece = "Knewyouweretrouble.mid"
-# mid_in = MidiFile(piece,clip=True)
-
-
-# In[3]:
 
 
 from miditoolkit.midi import parser as mid_parser
 from miditoolkit.midi import containers as ct
+from mido import MidiFile
+import time
+import operator
+import math
 
 
 # In[4]:
@@ -268,30 +255,3 @@ def skyline_melody(piece):
     final_notelist = skyline(clustered_notelist)
     # final_notelist2 = skyline2(clustered_notelist)
     return final_notelist  # ,final_notelist2
-
-
-# final_notelist2 = clustered_notelist #DIrectly include all
-
-
-# In[22]:
-
-
-# mido_out = mid_parser.MidiFile()
-# mido_out.ticks_per_beat = tpb
-# track = ct.Instrument(program=0,is_drum=False,name='example track')
-# mido_out.instruments = [track]
-# for note in final_notelist:
-#     mido_out.instruments[0].notes.append(ct.Note(start=note.onset,end=note.offset,pitch=note.pitch,velocity=30))
-# mido_out.dump("result.mid")
-
-
-# In[23]:
-
-
-# mido_out = mid_parser.MidiFile()
-# mido_out.ticks_per_beat = tpb
-# track = ct.Instrument(program=0,is_drum=False,name='example track')
-# mido_out.instruments = [track]
-# for note in final_notelist2:
-#     mido_out.instruments[0].notes.append(ct.Note(start=note.onset,end=note.offset,pitch=note.pitch,velocity=30))
-# mido_out.dump("result2.mid")

@@ -1,3 +1,42 @@
+
+# %%
+from postprocessing.postprocessing import postprocess
+
+# %%
+import glob
+
+files = glob.glob("./objective_eval/algo_unprocessed/*.mid")
+len(files)
+
+# %%
+target_dir = "./objective_eval/algo_processed/"
+import os
+
+for file in files:
+    outpath = target_dir + os.path.basename(file)
+    postprocess(file, outpath)
+
+# %%
+files = glob.glob("./objective_eval/cyclegan_unprocessed/*.mid")
+target_dir = "./objective_eval/cyclegan_processed/"
+for file in files:
+    outpath = target_dir + os.path.basename(file)
+    postprocess(file, outpath)
+
+# %%
+files = glob.glob("./objective_eval/bertr2f_unprocessed/*.mid")
+target_dir = "./objective_eval/bertr2f_processed/"
+for file in files:
+    outpath = target_dir + os.path.basename(file)
+    postprocess(file, outpath)
+
+# %%
+files = glob.glob("./objective_eval/bertreduction_unprocessed/*.mid")
+target_dir = "./objective_eval/bertreduction_processed/"
+for file in files:
+    outpath = target_dir + os.path.basename(file)
+    postprocess(file, outpath)
+
 # %%
 from miditoolkit.midi import parser as mid_parser
 import numpy as np
